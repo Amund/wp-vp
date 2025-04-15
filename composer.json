@@ -1,0 +1,9 @@
+{
+    "name": "amund/wp-vp",
+    "type": "wordpress-muplugin",
+    "description": "Base plugin to enhance WordPress templating system and cache.",
+    "homepage": "https://github.com/Amund/wp-vp",
+    "require": {
+        "php": ">=8.1"
+    }
+}
