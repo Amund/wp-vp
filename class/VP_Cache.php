@@ -42,7 +42,7 @@ class VP_Cache
         $path .= '/' . trim($name);
         $tmp = $path . '.tmp';
         $set = @file_put_contents($tmp, $value, LOCK_EX) === false ? false : true;
-        if ($set) {
+        if ($set && is_file($tmp)) {
             rename($tmp, $path);
         }
         return $set;
