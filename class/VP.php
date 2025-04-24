@@ -2,9 +2,7 @@
 
 class vp
 {
-    const PAGE = 'vp';
     const OPTIONS = 'vp-options';
-    const CAPABILITY = 'manage_options';
 
     /**
      * Process worpress template part
@@ -16,34 +14,31 @@ class vp
      */
     static function part(string $part, array $args = [], bool|int $cache = false): string
     {
-        $cache = $cache === true ? 0 : $cache;
-        $useCache = VP_CACHE && $cache !== false && !is_admin() ?? false;
-        $content = false;
-        $fromCache = false;
-        if (!is_array($args)) {
-            $args = [];
+        // generate cache name
+        $context = [
+            'part' => $part,
+            'lang' => defined('LANG') ? constant('LANG') : '',
+            'post_id' => get_the_ID() ?? '',
+            ...$args
+        ];
+        ksort($context);
+        $context_hash = hash('crc32c', json_encode($context));
+        $name = implode('-', ['part', $context_hash]);
+
+        // get cache
+        $content = wp_cache_get($name, 'vupar');
+        if (!is_admin() && $content !== false) {
+            if (wp_get_environment_type() === 'local') {
+                $content = strtr('<!--part {part} (from cache)-->{content}<!--part /{part} (from cache)-->', [
+                    '{part}' => $part,
+                    '{content}' => $content,
+                ]);
+            }
+            return $content;
         }
 
-        // check in cache
-        $name = '';
-        if (class_exists('VP_Cache') && $useCache) {
-            // complete context of part
-            $args['part'] = $part;
-            $args['lang'] = defined('LANG') ? constant('LANG') : '';
-            $post_id = get_the_ID();
-            if ($post_id) {
-                $args['post_id'] = $post_id;
-            }
-            ksort($args);
-            $name = hash('sha1', json_encode($args));
-            $content = VP_Cache::get($name, 'part');
-            if ($content !== false) {
-                $fromCache = true;
-            }
-        }
-
+        // generate content
         if ($content === false) {
-            // process part
             ob_start();
             $result = get_template_part('part/' . $part, null, $args);
             $content = ob_get_contents();
@@ -55,49 +50,50 @@ class vp
             }
 
             // set cache
-            if (class_exists('VP_Cache') && $useCache && $result !== false && $content !== '0' && !empty($content)) {
-                VP_Cache::set($name, $content, 'part');
+            if ($cache !== false) {
+                wp_cache_set($name, $content, 'vupar', is_int($cache) ? $cache : 0);
             }
         }
 
         // debug in dev
-        if ($content !== '0' && !empty($content) && wp_get_environment_type() === 'local') {
-            $content = strtr('<!-- {part}{cache} -->{content}<!-- /{part}{cache} -->', [
+        if (wp_get_environment_type() === 'local') {
+            $content = strtr('<!--part {part}-->{content}<!--part /{part}-->', [
                 '{part}' => $part,
                 '{content}' => $content,
-                '{cache}' => $fromCache ? ' (from cache)' : '',
             ]);
         }
 
         return $content;
     }
 
-    static function menu(string $menu_location, array $ctx = []): string
+    static function menu(string $menu_location, array $context = []): string
     {
-        $cache = VP_CACHE;
-        $menu = false;
-        $name = '';
-        if ($cache) {
-            $ctx = ['location' => $menu_location, ...$ctx];
-            ksort($ctx);
-            $name = hash('crc32c', json_encode($ctx));
-            $name = $menu_location . '-' . $name;
-            $menu = VP_Cache::get($name, 'menu');
+        // generate cache name
+        $context = ['location' => $menu_location, ...$context];
+        ksort($context);
+        $context_hash = hash('crc32c', json_encode($context));
+        $name = implode('-', ['menu', $context_hash]);
+
+        // get cache
+        $menu = wp_cache_get($name, 'vupar');
+        if (!is_admin() && $menu !== false) {
+            return $menu;
         }
-        if ($menu === false) {
-            ob_start();
-            if (has_nav_menu($menu_location)) {
-                wp_nav_menu([
-                    'theme_location' => $menu_location,
-                    'container' => false,
-                    'items_wrap' => '<ul class="%2$s" id="%1$s" tabindex="0">%3$s</ul>',
-                ]);
-            }
-            $menu = ob_get_clean();
-            if ($cache && !empty($menu)) {
-                VP_Cache::set($name, $menu, 'menu');
-            }
+
+        // generate menu
+        ob_start();
+        if (has_nav_menu($menu_location)) {
+            wp_nav_menu([
+                'theme_location' => $menu_location,
+                'container' => false,
+                'items_wrap' => '<ul class="%2$s" id="%1$s" tabindex="0">%3$s</ul>',
+            ]);
         }
+        $menu = ob_get_clean();
+
+        // set cache
+        wp_cache_set($name, $menu, 'vupar');
+
         return $menu;
     }
 
@@ -257,52 +253,6 @@ class vp
     }
 
     /**
-     * Enqueues and registers CSS files as modules with versioning based on file hash.
-     *
-     * Retrieves the list of styles from the cache. If not available, it scans the given directory
-     * for CSS files, calculates their hash, and stores the information in cache. The styles
-     * are then registered and enqueued as modules for use in the site, and linked in the HTML
-     * head with a preload tag.
-     *
-     * @param string $dir  The directory path containing CSS files.
-     * @param string $url  The base URL to access the CSS files.
-     * @param string $hash The hashing algorithm to use for versioning (default: 'crc32c').
-     */
-    static function styles(string $dir, string $url, string $hash = 'crc32c'): void
-    {
-        $vp_cache = defined('VP_CACHE') ? constant('VP_CACHE') : true;
-        if (!$vp_cache) {
-            VP_Cache::unset('styles.php');
-        }
-        $list = VP_Cache::get('styles.php');
-        if (!is_array($list)) {
-            $list = [];
-            $map = self::filemap($dir);
-            foreach ($map as $itemPath) {
-                if (str_ends_with($itemPath, '.css')) {
-                    $itemId = '@vp-css/' . preg_replace('#\.css$#', '', $itemPath);
-                    $itemHash = hash_file($hash, $dir . '/' . $itemPath);
-                    $list[] = [
-                        'id' => $itemId,
-                        'url' => $url . '/' . $itemPath,
-                        'hash' => $itemHash,
-                    ];
-                }
-            }
-            VP_Cache::set('styles.php', "<?php\n\nreturn " . var_export($list, true) . ";");
-        }
-
-        $preload = [];
-        foreach ($list as $item) {
-            wp_enqueue_style($item['id'], $item['url'], [], $item['hash'], 'all');
-            $preload[] = ['href' => $item['url'] . '?ver=' . $item['hash'], 'as' => 'style'];
-        }
-        add_filter('wp_preload_resources', function ($resources) use ($preload) {
-            return [...$resources, ...$preload];
-        });
-    }
-
-    /**
      * Enqueues and registers JavaScript files as modules with versioning based on file hash.
      *
      * Retrieves the list of scripts from the cache. If not available, it scans the given directory
@@ -313,20 +263,16 @@ class vp
      * @param string $url  The base URL to access the JavaScript files.
      * @param string $hash The hashing algorithm to use for versioning (default: 'crc32c').
      */
-    static function scripts(string $dir, string $url, string $hash = 'crc32c'): void
+    static function scripts(string $dir, string $url): void
     {
-        $vp_cache = defined('VP_CACHE') ? constant('VP_CACHE') : true;
-        if (!$vp_cache) {
-            VP_Cache::unset('scripts.php');
-        }
-        $list = VP_Cache::get('scripts.php');
-        if (!is_array($list)) {
+        $list = wp_cache_get('scripts', 'vupar');
+        if ($list === false) {
             $list = [];
             $map = self::filemap($dir);
             foreach ($map as $itemPath) {
                 if (str_ends_with($itemPath, '.js')) {
                     $itemId = '@vp/' . preg_replace('#\.js$#', '', $itemPath);
-                    $itemHash = hash_file($hash, $dir . '/' . $itemPath);
+                    $itemHash = filemtime($dir . '/' . $itemPath);
                     $list[] = [
                         'id' => $itemId,
                         'url' => $url . '/' . $itemPath,
@@ -334,7 +280,7 @@ class vp
                     ];
                 }
             }
-            VP_Cache::set('scripts.php', "<?php\n\nreturn " . var_export($list, true) . ";");
+            wp_cache_set('scripts', $list, 'vupar');
         }
 
         foreach ($list as $item) {
@@ -354,12 +300,8 @@ class vp
      */
     static function blocks(string $dir): void
     {
-        $vp_cache = defined('VP_CACHE') ? constant('VP_CACHE') : true;
-        if (!$vp_cache) {
-            VP_Cache::unset('blocks.php');
-        }
-        $list = VP_Cache::get('blocks.php');
-        if (!is_array($list)) {
+        $list = wp_cache_get('blocks', 'vupar');
+        if ($list === false) {
             $list = [];
             $di = new DirectoryIterator($dir);
             foreach (new DirectoryIterator(get_template_directory() . '/block') as $block) {
@@ -367,7 +309,7 @@ class vp
                     $list[] = $block->getRealpath();
                 }
             }
-            VP_Cache::set('blocks.php', "<?php\n\nreturn " . var_export($list, true) . ";");
+            wp_cache_set('blocks', $list, 'vupar');
         }
         foreach ($list as $path) {
             register_block_type($path);

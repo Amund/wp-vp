@@ -4,7 +4,6 @@
  * Plugin Name: Vupar
  * Plugin URI:        https://github.com/Amund/wp-vp
  * Description:       Base plugin to enhance WordPress templating system and cache.
- * Version:           1.0.0
  * Requires at least: 6.1
  * Requires PHP:      8.1
  * Author:            Dimitri Avenel
@@ -15,26 +14,40 @@ if (!defined('ABSPATH')) {
     exit();
 }
 
-$cache_path = [sys_get_temp_dir(), 'vp-cache', hash('crc32c', get_bloginfo('url'))];
-define('VP_CACHE_PATH', implode(DIRECTORY_SEPARATOR, $cache_path));
-defined('VP_CACHE') ?: define('VP_CACHE', true);
-
 require_once 'class/VP.php';
-require_once 'class/VP_Cache.php';
 
-add_action('plugins_loaded', function () {
-    if (current_user_can(vp::CAPABILITY) && !wp_doing_ajax()) {
-        require_once 'class/VP_Cache_Admin.php';
-        VP_Cache_Admin::init();
+// add a clear cache button to the admin bar for sqlite-object-cache plugin
+add_action('admin_bar_menu', function ($wp_admin_bar) {
+    global $wp_object_cache;
+    $color = '#FF0000';
+    if (method_exists($wp_object_cache, 'get_cache_type')) {
+        $type = $wp_object_cache->get_cache_type();
+        if (str_ends_with($type, 'SQLite')) {
+            $color = '#00FF00';
+        }
     }
+
+    $args = [
+        'id' => 'vp-cache-clear',
+        'title' => '<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg"><circle fill="' . $color . '" cx="4" cy="4" r="4" /></svg> Clear cache',
+        'href' => admin_url('admin.php?&action=vp_cache_flush'),
+    ];
+    $wp_admin_bar->add_node($args);
+}, 9999);
+
+add_action('admin_action_vp_cache_flush', function () {
+    global $wp_object_cache;
+    if (method_exists($wp_object_cache, 'flush')) {
+        $wp_object_cache->flush(true);
+    }
+    wp_redirect($_SERVER['HTTP_REFERER']);
+    exit();
 });
 
-// wp-cli
-if (defined('WP_CLI') && WP_CLI) {
-
-    require_once 'class/VP_Cache_CLI.php';
-
-    add_action('cli_init', function () {
-        WP_CLI::add_command('vp-cache', 'VP_Cache_CLI');
-    });
-}
+// add_action('delete_post', [static::class, 'clear']);
+// add_action('save_post', [static::class, 'clear']);
+// add_action('delete_term', [static::class, 'clear']);
+// add_action('edit_term', [static::class, 'clear']);
+// add_action('wp_create_nav_menu', [static::class, 'clear']);
+// add_action('wp_update_nav_menu', [static::class, 'clear']);
+// add_action('wp_delete_nav_menu', [static::class, 'clear']);
