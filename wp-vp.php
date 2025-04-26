@@ -20,11 +20,8 @@ require_once 'class/VP.php';
 add_action('admin_bar_menu', function ($wp_admin_bar) {
     global $wp_object_cache;
     $color = '#FF0000';
-    if (method_exists($wp_object_cache, 'get_cache_type')) {
-        $type = $wp_object_cache->get_cache_type();
-        if (str_ends_with($type, 'SQLite')) {
-            $color = '#00FF00';
-        }
+    if (is_plugin_active('sqlite-object-cache/sqlite-object-cache.php')) {
+        $color = '#00FF00';
     }
 
     $args = [
@@ -37,7 +34,7 @@ add_action('admin_bar_menu', function ($wp_admin_bar) {
 
 add_action('admin_action_vp_cache_flush', function () {
     global $wp_object_cache;
-    if (method_exists($wp_object_cache, 'flush')) {
+    if (is_plugin_active('sqlite-object-cache/sqlite-object-cache.php')) {
         $wp_object_cache->flush(true);
     }
     wp_redirect($_SERVER['HTTP_REFERER']);
