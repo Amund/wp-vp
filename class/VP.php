@@ -14,27 +14,31 @@ class vp
      */
     static function part(string $part, array $args = [], bool|int $cache = false): string
     {
-        // generate cache name
-        $context = [
-            'part' => $part,
-            'lang' => defined('LANG') ? constant('LANG') : '',
-            'post_id' => get_the_ID() ?? '',
-            ...$args
-        ];
-        ksort($context);
-        $context_hash = hash('crc32c', json_encode($context));
-        $name = implode('-', ['part', $context_hash]);
+        if ($cache === false) {
+            $content = false;
+        } else {
+            // generate cache name
+            $context = [
+                'part' => $part,
+                'lang' => defined('LANG') ? constant('LANG') : '',
+                'post_id' => get_the_ID() ?? '',
+                ...$args
+            ];
+            ksort($context);
+            $context_hash = hash('crc32c', json_encode($context));
+            $name = implode('-', ['part', $context_hash]);
 
-        // get cache
-        $content = wp_cache_get($name, 'vupar');
-        if (!is_admin() && $content !== false) {
-            if (wp_get_environment_type() === 'local') {
-                $content = strtr('<!--part {part} (from cache)-->{content}<!--part /{part} (from cache)-->', [
-                    '{part}' => $part,
-                    '{content}' => $content,
-                ]);
+            // get cache
+            $content = wp_cache_get($name, 'vupar');
+            if (!is_admin() && $content !== false) {
+                if (wp_get_environment_type() === 'local') {
+                    $content = strtr('<!--part {part} (from cache)-->{content}<!--part /{part} (from cache)-->', [
+                        '{part}' => $part,
+                        '{content}' => $content,
+                    ]);
+                }
+                return $content;
             }
-            return $content;
         }
 
         // generate content
