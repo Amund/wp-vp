@@ -73,7 +73,12 @@ class vp
     static function menu(string $menu_location, array $context = []): string
     {
         // generate cache name
-        $context = ['location' => $menu_location, ...$context];
+        $context = [
+            'container' => false,
+            'items_wrap' => '<ul class="%2$s" id="%1$s" tabindex="0">%3$s</ul>',
+            ...$context,
+            'theme_location' => $menu_location
+        ];
         ksort($context);
         $context_hash = hash('crc32c', json_encode($context));
         $name = implode('-', ['menu', $context_hash]);
@@ -87,11 +92,7 @@ class vp
         // generate menu
         ob_start();
         if (has_nav_menu($menu_location)) {
-            wp_nav_menu([
-                'theme_location' => $menu_location,
-                'container' => false,
-                'items_wrap' => '<ul class="%2$s" id="%1$s" tabindex="0">%3$s</ul>',
-            ]);
+            wp_nav_menu($context);
         }
         $menu = ob_get_clean();
 
