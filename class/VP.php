@@ -31,7 +31,7 @@ class vp
             // get cache
             $content = wp_cache_get($name, 'vupar');
             if (!is_admin() && $content !== false) {
-                if (wp_get_environment_type() === 'local') {
+                if (wp_get_environment_type() === 'local' && !empty($content)) {
                     $content = strtr('<!--part {part} (from cache)-->{content}<!--part /{part} (from cache)-->', [
                         '{part}' => $part,
                         '{content}' => $content,
@@ -60,7 +60,7 @@ class vp
         }
 
         // debug in dev
-        if (wp_get_environment_type() === 'local') {
+        if (wp_get_environment_type() === 'local' && !empty($content)) {
             $content = strtr('<!--part {part}-->{content}<!--part /{part}-->', [
                 '{part}' => $part,
                 '{content}' => $content,
