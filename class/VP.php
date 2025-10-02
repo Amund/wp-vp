@@ -168,13 +168,14 @@ class vp
     }
 
     /**
-     * Renders breadcrumbs, from homepage to current page.
+     * Make a render array of breadcrumbs, from homepage to current page.
      *
      * Hooked to `vp_breadcrumbs_ancestors` filter to allow adding more items to breadcrumbs, between homepage and current page.
      *
+     * @param array $args Array of optional arguments, `home_title` and `home_url`.
      * @return ?array HTML render array.
      */
-    static function breadcrumbs(): ?array
+    static function breadcrumbs(array $args = []): ?array
     {
         if (is_front_page()) {
             // no breadcrumb on front page
@@ -188,7 +189,9 @@ class vp
         }
 
         // build items array
-        $home = vp::breadcrumbs_item(__('Homepage', 'vupar'), get_home_url());
+        $home_title = (string) ($args['home_title'] ?? __('Homepage'));
+        $home_url = (string) ($args['home_url'] ?? get_home_url());
+        $home = vp::breadcrumbs_item($home_title, $home_url);
         $current = vp::breadcrumbs_item_from_post($object);
         $ancestors = apply_filters('vp_breadcrumbs_ancestors', []) ?? [];
         $items = [$home, ...$ancestors, $current];
