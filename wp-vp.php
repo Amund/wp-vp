@@ -34,9 +34,12 @@ add_action('admin_bar_menu', function ($wp_admin_bar) {
 
 add_action('admin_action_vp_cache_flush', function () {
     global $wp_object_cache;
+    // flush object cache
     if (is_plugin_active('sqlite-object-cache/sqlite-object-cache.php')) {
         $wp_object_cache->flush(true);
     }
+    // flush rewrites
+    delete_option('rewrite_rules');
     wp_redirect($_SERVER['HTTP_REFERER']);
     exit();
 });
