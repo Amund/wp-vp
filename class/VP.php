@@ -150,7 +150,7 @@ class vp
                 $list[] = [
                     '@type' => 'ListItem',
                     'position' => $i + 1,
-                    'name' => $item->title,
+                    'name' => strip_tags($item->title),
                     'item' => [
                         '@type' => 'WebPage',
                         '@id' => $item->url,
