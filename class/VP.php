@@ -123,12 +123,12 @@ class vp
      * @param WP_Post|integer $post The post object or its ID.
      * @return stdClass A breadcrumb item with title and url properties.
      */
-    static function breadcrumbs_item_from_post($post): stdClass
+    static function breadcrumbs_item_from_post($post, $current = false): stdClass
     {
         $post = get_post($post);
         $title = get_the_title($post);
         $url = get_permalink($post);
-        if (!$url) {
+        if (!$url || $current) {
             $url = '';
         }
         return vp::breadcrumbs_item($title, $url);
@@ -192,7 +192,7 @@ class vp
         $home_title = (string) ($args['home_title'] ?? __('Homepage'));
         $home_url = (string) ($args['home_url'] ?? get_home_url());
         $home = vp::breadcrumbs_item($home_title, $home_url);
-        $current = vp::breadcrumbs_item_from_post($object);
+        $current = vp::breadcrumbs_item_from_post($object, true);
         $ancestors = apply_filters('vp_breadcrumbs_ancestors', []) ?? [];
         $items = [$home, ...$ancestors, $current];
 
@@ -201,7 +201,8 @@ class vp
 
         // build breadcrumbs list from items array
         $crumbs = [];
-        if (is_array($items) && count($items) > 0) {
+        if (is_array($items)) {
+            $nb = count($items);
             foreach ($items as $i => $item) {
                 $title = $item->title ?? '';
                 $url = $item->url ?? '';
@@ -215,6 +216,7 @@ class vp
                         'content' => $title,
                     ];
                 }
+                if ($i === $nb - 1) $crumb['aria-current'] = 'page';
                 $crumbs[] = ['tag' => 'li', 'content' => $crumb];
             }
         }
