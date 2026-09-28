@@ -20,6 +20,9 @@ require_once 'class/VP.php';
 add_action('vp_cache_flush', function () {
     wp_cache_flush();
     delete_option('rewrite_rules');
+    if (function_exists('opcache_reset')) {
+        opcache_reset();
+    }
 });
 
 // add a clear cache button to the admin bar for sqlite-object-cache plugin
@@ -37,18 +40,10 @@ add_action('admin_bar_menu', function ($wp_admin_bar) {
 add_action('wp_ajax_vp_cache_flush', function () {
     check_ajax_referer('vp_cache_flush', 'nonce');
     if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'Permission refusée.'], 403);
-    }
-    global $wp_object_cache;
-    if (is_plugin_active('sqlite-object-cache/sqlite-object-cache.php')) {
-        $result = $wp_object_cache->flush(true);
-        if (false === $result) {
-            wp_send_json_error(['message' => 'Erreur lors du vidage du cache.'], 500);
-        }
+        wp_send_json_error(['message' => 'Forbidden'], 403);
     }
     do_action('vp_cache_flush');
-    delete_option('rewrite_rules');
-    wp_send_json_success(['message' => 'Cache vidé avec succès.']);
+    wp_send_json_success(['message' => 'Ok']);
 });
 
 function vp_cache_ajax_script()
