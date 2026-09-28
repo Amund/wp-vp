@@ -16,24 +16,21 @@ if (!defined('ABSPATH')) {
 
 require_once 'class/VP.php';
 
-// add a clear cache button to the admin bar for sqlite-object-cache plugin
 
+add_action('vp_cache_flush', function () {
+    wp_cache_flush();
+    delete_option('rewrite_rules');
+});
+
+// add a clear cache button to the admin bar for sqlite-object-cache plugin
 add_action('admin_bar_menu', function ($wp_admin_bar) {
     $active = is_plugin_active(
         'sqlite-object-cache/sqlite-object-cache.php'
     );
-    $color = $active ? '#00FF00' : '#FF0000';
     $wp_admin_bar->add_node([
         'id'    => 'vp-cache-clear',
-        'title' => '<svg width="8" height="8" viewBox="0 0 8 8" '
-            . 'xmlns="http://www.w3.org/2000/svg">'
-            . '<circle fill="' . esc_attr($color) . '" '
-            . 'cx="4" cy="4" r="4" /></svg> '
-            . 'Vider le cache',
+        'title' => 'Vider le cache',
         'href'  => '#',
-        'meta'  => [
-            'title' => 'Vider le cache',
-        ],
     ]);
 }, 9999);
 
@@ -110,6 +107,13 @@ function vp_cache_ajax_script()
         });
     </script>
 <?php
+}
+
+if (defined('WP_CLI') && WP_CLI) {
+    WP_CLI::add_command('vp cache flush', function () {
+        do_action('vp_cache_flush');
+        WP_CLI::success('Cache vidé avec succès.');
+    });
 }
 
 add_action('admin_footer', 'vp_cache_ajax_script');
