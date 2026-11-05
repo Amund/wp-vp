@@ -25,11 +25,15 @@ add_action('vp_cache_flush', function () {
     }
 });
 
-// add a clear cache button to the admin bar for sqlite-object-cache plugin
+// capability required to flush the cache (editors and above by default)
+function vp_cache_flush_capability(): string
+{
+    return (string) apply_filters('vp_cache_flush_capability', 'edit_others_posts');
+}
+
+// add a clear cache button to the admin bar
 add_action('admin_bar_menu', function ($wp_admin_bar) {
-    $active = is_plugin_active(
-        'sqlite-object-cache/sqlite-object-cache.php'
-    );
+    if (!current_user_can(vp_cache_flush_capability())) return;
     $wp_admin_bar->add_node([
         'id'    => 'vp-cache-clear',
         'title' => 'Vider le cache',
@@ -39,7 +43,7 @@ add_action('admin_bar_menu', function ($wp_admin_bar) {
 
 add_action('wp_ajax_vp_cache_flush', function () {
     check_ajax_referer('vp_cache_flush', 'nonce');
-    if (!current_user_can('manage_options')) {
+    if (!current_user_can(vp_cache_flush_capability())) {
         wp_send_json_error(['message' => 'Forbidden'], 403);
     }
     do_action('vp_cache_flush');
@@ -49,7 +53,7 @@ add_action('wp_ajax_vp_cache_flush', function () {
 function vp_cache_ajax_script()
 {
     if (!is_admin_bar_showing()) return;
-    if (!current_user_can('manage_options')) return;
+    if (!current_user_can(vp_cache_flush_capability())) return;
     $ajax_url = admin_url('admin-ajax.php');
     $nonce = wp_create_nonce('vp_cache_flush');
 ?>
