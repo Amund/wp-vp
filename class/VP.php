@@ -80,7 +80,15 @@ class vp
             'theme_location' => $menu_location
         ];
         ksort($context);
-        $context_hash = hash('crc32c', json_encode($context));
+
+        // the rendered menu depends on the current page (current-menu-* classes, aria-current)
+        // and on the language (polylang assigns a different menu to the same location)
+        $cache_context = [
+            'args' => $context,
+            'lang' => defined('LANG') ? constant('LANG') : '',
+            'page' => static::page_context(),
+        ];
+        $context_hash = hash('crc32c', json_encode($cache_context));
         $name = implode('-', ['menu', $context_hash]);
 
         // get cache
@@ -100,6 +108,37 @@ class vp
         wp_cache_set($name, $menu, 'vupar');
 
         return $menu;
+    }
+
+    /**
+     * Returns a string identifying the current page, based on the main query.
+     *
+     * Built from the queried object rather than the url, so the number of possible
+     * values is bounded by the site content (no cache pollution with query strings
+     * or random 404 urls).
+     *
+     * @return string Page identifier, e.g. "post:42", "term:7", "archive:product", "search".
+     */
+    static function page_context(): string
+    {
+        global $wp_query;
+        if (!isset($wp_query)) {
+            return 'none';
+        }
+
+        $object = get_queried_object();
+        if ($object instanceof WP_Post) return 'post:' . $object->ID;
+        if ($object instanceof WP_Term) return 'term:' . $object->term_id;
+        if ($object instanceof WP_User) return 'user:' . $object->ID;
+        if ($object instanceof WP_Post_Type) return 'archive:' . $object->name;
+
+        if (is_front_page()) return 'front';
+        if (is_home()) return 'home';
+        if (is_search()) return 'search';
+        if (is_404()) return '404';
+        if (is_date()) return 'date';
+
+        return 'other';
     }
 
     /**
