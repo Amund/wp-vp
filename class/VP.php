@@ -39,11 +39,14 @@ class vp
             }
         }
 
-        // generate content
+        // generate content (finally: an exception in the template must not leave the buffer open)
         ob_start();
-        $result = get_template_part('part/' . $part, null, $args);
-        $content = ob_get_contents();
-        ob_end_clean();
+        try {
+            $result = get_template_part('part/' . $part, null, $args);
+            $content = ob_get_contents();
+        } finally {
+            ob_end_clean();
+        }
 
         // error: part not found, logged and displayed in debug mode only
         if ($result === false) {
