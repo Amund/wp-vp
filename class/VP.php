@@ -231,9 +231,11 @@ class vp
         $home_title = (string) ($args['home_title'] ?? __('Homepage'));
         $home_url = (string) ($args['home_url'] ?? get_home_url());
         $home = vp::breadcrumbs_item($home_title, $home_url);
-        $current = vp::breadcrumbs_item_from_post($object, true);
+        // keep the current url for json-ld, the link is removed at html rendering
+        $current = vp::breadcrumbs_item_from_post($object);
         $ancestors = apply_filters('vp_breadcrumbs_ancestors', []) ?? [];
-        $items = [$home, ...$ancestors, $current];
+        // reindex: string keys from the filter would break current item detection and json positions
+        $items = array_values([$home, ...$ancestors, $current]);
 
         // prepare json
         $json = vp::breadcrumbs_json($items);
@@ -245,7 +247,8 @@ class vp
             foreach ($items as $i => $item) {
                 $title = $item->title ?? '';
                 $url = $item->url ?? '';
-                if (empty($url) || $url === '#') {
+                $is_current = $i === $nb - 1;
+                if ($is_current || empty($url) || $url === '#') {
                     $crumb = ['tag' => 'span', 'content' => $title];
                 } else {
                     $crumb = [
@@ -255,7 +258,7 @@ class vp
                         'content' => $title,
                     ];
                 }
-                if ($i === $nb - 1) $crumb['aria-current'] = 'page';
+                if ($is_current) $crumb['aria-current'] = 'page';
                 $crumbs[] = ['tag' => 'li', 'content' => $crumb];
             }
         }
