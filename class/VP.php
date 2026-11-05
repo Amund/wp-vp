@@ -313,14 +313,14 @@ class vp
      *
      * @param string $dir  The directory path containing JavaScript files.
      * @param string $url  The base URL to access the JavaScript files.
-     * @param string $hash The hashing algorithm to use for versioning (default: 'crc32c').
      */
     static function scripts(string $dir, string $url): void
     {
         $list = wp_cache_get('scripts', 'vupar');
         if ($list === false) {
             $list = [];
-            $map = self::filemap($dir);
+            // filemap() returns false for an empty or missing directory
+            $map = self::filemap($dir) ?: [];
             foreach ($map as $itemPath) {
                 if (str_ends_with($itemPath, '.js')) {
                     $itemId = '@vp/' . preg_replace('#\.js$#', '', $itemPath);
