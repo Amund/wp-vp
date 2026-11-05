@@ -45,13 +45,18 @@ class vp
         $content = ob_get_contents();
         ob_end_clean();
 
-        // error: part not found
+        // error: part not found, logged and displayed in debug mode only
         if ($result === false) {
-            $content = '<div class="error notice notice-error"><p>part "' . $part . '" not found.</p></div>';
+            $content = '';
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                $message = 'part "' . $part . '" not found.';
+                error_log('vp::part: ' . $message);
+                $content = '<div class="error notice notice-error"><p>' . esc_html($message) . '</p></div>';
+            }
         }
 
-        // set cache
-        if ($name !== null) {
+        // set cache (not for a missing part: it must show up as soon as the file exists)
+        if ($name !== null && $result !== false) {
             wp_cache_set($name, $content, 'vupar', is_int($cache) ? $cache : 0);
         }
 
