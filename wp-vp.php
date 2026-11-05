@@ -104,10 +104,11 @@ function vp_cache_ajax_script()
 <?php
 }
 
+// wp cache flush: run the full flush after the native command (skipped if it fails)
 if (defined('WP_CLI') && WP_CLI) {
-    WP_CLI::add_command('vp cache flush', function () {
+    WP_CLI::add_hook('after_invoke:cache flush', function () {
         do_action('vp_cache_flush');
-        WP_CLI::success('Cache vidé avec succès.');
+        WP_CLI::success('Cache Vupar vidé.');
     });
 }
 
