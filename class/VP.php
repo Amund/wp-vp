@@ -14,9 +14,9 @@ class vp
      */
     static function part(string $part, array $args = [], bool|int $cache = false): string
     {
-        if ($cache === false) {
-            $content = false;
-        } else {
+        $name = null;
+        $content = false;
+        if ($cache !== false) {
             // generate cache name
             $context = [
                 'part' => $part,
@@ -25,11 +25,10 @@ class vp
                 ...$args
             ];
             ksort($context);
-            $context_hash = hash('crc32c', json_encode($context));
-            $name = implode('-', ['part', $context_hash]);
+            $name = static::cache_name('part', $context);
 
-            // get cache
-            $content = wp_cache_get($name, 'vupar');
+            // get cache (no cache name: context can't be encoded, part is generated without cache)
+            $content = $name === null ? false : wp_cache_get($name, 'vupar');
             if (!is_admin() && $content !== false) {
                 if (wp_get_environment_type() === 'local' && !empty($content)) {
                     $content = strtr('<!--part {part} (from cache)-->{content}<!--part /{part} (from cache)-->', [
@@ -54,7 +53,7 @@ class vp
             }
 
             // set cache
-            if ($cache !== false) {
+            if ($name !== null) {
                 wp_cache_set($name, $content, 'vupar', is_int($cache) ? $cache : 0);
             }
         }
@@ -88,11 +87,10 @@ class vp
             'lang' => defined('LANG') ? constant('LANG') : '',
             'page' => static::page_context(),
         ];
-        $context_hash = hash('crc32c', json_encode($cache_context));
-        $name = implode('-', ['menu', $context_hash]);
+        $name = static::cache_name('menu', $cache_context);
 
         // get cache
-        $menu = wp_cache_get($name, 'vupar');
+        $menu = $name === null ? false : wp_cache_get($name, 'vupar');
         if (!is_admin() && $menu !== false) {
             return $menu;
         }
@@ -105,9 +103,31 @@ class vp
         $menu = ob_get_clean();
 
         // set cache
-        wp_cache_set($name, $menu, 'vupar');
+        if ($name !== null) {
+            wp_cache_set($name, $menu, 'vupar');
+        }
 
         return $menu;
+    }
+
+    /**
+     * Builds a cache name from a context array.
+     *
+     * Returns null if the context can't be json encoded (recursion, NAN/INF...): without this
+     * check, every failing context would share the same cache entry and serve the same content.
+     * Invalid UTF-8 is substituted instead of failing.
+     *
+     * @param string $prefix Cache name prefix, e.g. "part" or "menu".
+     * @param array $context Values identifying the cached content.
+     * @return ?string Cache name, or null if the content must not be cached.
+     */
+    static function cache_name(string $prefix, array $context): ?string
+    {
+        $json = json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($json === false) {
+            return null;
+        }
+        return $prefix . '-' . hash('xxh128', $json);
     }
 
     /**
