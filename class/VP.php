@@ -473,13 +473,18 @@ class vp
      */
     static function require_dir($path): void
     {
-        $dir = new RecursiveDirectoryIterator($path);
+        $dir = new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS);
         $iterator = new RecursiveIteratorIterator($dir);
+        $files = [];
         foreach ($iterator as $file) {
-            $fname = $file->getFilename();
-            if (str_ends_with($fname, '.php')) {
-                require_once $file->getPathname();
+            if (str_ends_with($file->getFilename(), '.php')) {
+                $files[] = $file->getPathname();
             }
+        }
+        // the filesystem order differs between servers and can change on deploy: sort it
+        sort($files, SORT_NATURAL | SORT_FLAG_CASE);
+        foreach ($files as $file) {
+            require_once $file;
         }
     }
 }
