@@ -349,16 +349,16 @@ class vp
      */
     static function blocks(string $dir): void
     {
-        $list = wp_cache_get('blocks', 'vupar');
+        $name = 'blocks-' . hash('crc32c', $dir);
+        $list = wp_cache_get($name, 'vupar');
         if ($list === false) {
             $list = [];
-            $di = new DirectoryIterator($dir);
-            foreach (new DirectoryIterator(get_template_directory() . '/block') as $block) {
+            foreach (new DirectoryIterator($dir) as $block) {
                 if ($block->isDir() && !$block->isDot()) {
                     $list[] = $block->getRealpath();
                 }
             }
-            wp_cache_set('blocks', $list, 'vupar');
+            wp_cache_set($name, $list, 'vupar');
         }
         foreach ($list as $path) {
             register_block_type($path);
