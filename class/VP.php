@@ -74,6 +74,20 @@ class vp
         return $content;
     }
 
+    /**
+     * Renders the menu assigned to a theme location, with cache.
+     *
+     * Defaults passed to wp_nav_menu(): no container, and a `<ul>` wrapper with `tabindex="0"`.
+     * The cache is always used. Its key depends on the arguments, the language (LANG) and the
+     * current page (see page_context()), because the output contains current-menu-* classes
+     * and aria-current. The cache is bypassed in editing contexts (see cache_bypass()).
+     *
+     * @param string $menu_location Theme location, as registered with register_nav_menus().
+     * @param array $context Arguments merged into wp_nav_menu() arguments (theme_location can't be
+     *                       overridden). Unknown keys are ignored by wp_nav_menu() but still vary
+     *                       the cache key.
+     * @return string Menu HTML, or an empty string if no menu is assigned to the location.
+     */
     static function menu(string $menu_location, array $context = []): string
     {
         // generate cache name
