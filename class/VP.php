@@ -254,7 +254,8 @@ class vp
                 $list[] = [
                     '@type' => 'ListItem',
                     'position' => $i + 1,
-                    'name' => strip_tags($item->title),
+                    // titles are html (wptexturize entities like &#8217;), json-ld expects plain text
+                    'name' => html_entity_decode(strip_tags($item->title), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                     'item' => [
                         '@type' => 'WebPage',
                         '@id' => $item->url,
@@ -266,7 +267,8 @@ class vp
                 '@type' => 'BreadcrumbList',
                 'itemListElement' => $list,
             ];
-            return json_encode($json, JSON_UNESCAPED_SLASHES) ?: '';
+            // JSON_HEX_TAG: a decoded title like "</script>" must not close the script tag
+            return json_encode($json, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?: '';
         }
         return '';
     }
