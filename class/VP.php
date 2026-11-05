@@ -15,8 +15,7 @@ class vp
     static function part(string $part, array $args = [], bool|int $cache = false): string
     {
         $name = null;
-        $content = false;
-        if ($cache !== false) {
+        if ($cache !== false && !static::cache_bypass()) {
             // generate cache name
             $context = [
                 'part' => $part,
@@ -29,7 +28,7 @@ class vp
 
             // get cache (no cache name: context can't be encoded, part is generated without cache)
             $content = $name === null ? false : wp_cache_get($name, 'vupar');
-            if (!is_admin() && $content !== false) {
+            if ($content !== false) {
                 if (wp_get_environment_type() === 'local' && !empty($content)) {
                     $content = strtr('<!--part {part} (from cache)-->{content}<!--part /{part} (from cache)-->', [
                         '{part}' => $part,
@@ -41,21 +40,19 @@ class vp
         }
 
         // generate content
-        if ($content === false) {
-            ob_start();
-            $result = get_template_part('part/' . $part, null, $args);
-            $content = ob_get_contents();
-            ob_end_clean();
+        ob_start();
+        $result = get_template_part('part/' . $part, null, $args);
+        $content = ob_get_contents();
+        ob_end_clean();
 
-            // error: part not found
-            if ($result === false) {
-                $content = '<div class="error notice notice-error"><p>part "' . $part . '" not found.</p></div>';
-            }
+        // error: part not found
+        if ($result === false) {
+            $content = '<div class="error notice notice-error"><p>part "' . $part . '" not found.</p></div>';
+        }
 
-            // set cache
-            if ($name !== null) {
-                wp_cache_set($name, $content, 'vupar', is_int($cache) ? $cache : 0);
-            }
+        // set cache
+        if ($name !== null) {
+            wp_cache_set($name, $content, 'vupar', is_int($cache) ? $cache : 0);
         }
 
         // debug in dev
@@ -87,11 +84,11 @@ class vp
             'lang' => defined('LANG') ? constant('LANG') : '',
             'page' => static::page_context(),
         ];
-        $name = static::cache_name('menu', $cache_context);
+        $name = static::cache_bypass() ? null : static::cache_name('menu', $cache_context);
 
         // get cache
         $menu = $name === null ? false : wp_cache_get($name, 'vupar');
-        if (!is_admin() && $menu !== false) {
+        if ($menu !== false) {
             return $menu;
         }
 
@@ -108,6 +105,32 @@ class vp
         }
 
         return $menu;
+    }
+
+    /**
+     * Whether the vupar cache must be bypassed (neither read nor written) for this request.
+     *
+     * Editing contexts must always render fresh content, and must never write into the cache
+     * a rendering that could differ from the public one (block preview placeholders...):
+     * - admin screens (but not front-end ajax requests going through admin-ajax.php),
+     * - ACF block previews in the editor (ajax action acf/ajax/fetch-block),
+     * - dynamic block previews in the editor (REST route /wp/v2/block-renderer),
+     * - post previews and customizer previews.
+     * Other ajax and REST requests (e.g. list loading) keep the cache.
+     *
+     * Filterable with `vp_cache_bypass`.
+     */
+    static function cache_bypass(): bool
+    {
+        if (wp_doing_ajax()) {
+            $bypass = ($_REQUEST['action'] ?? '') === 'acf/ajax/fetch-block';
+        } elseif (defined('REST_REQUEST') && REST_REQUEST) {
+            $route = $GLOBALS['wp']->query_vars['rest_route'] ?? '';
+            $bypass = is_string($route) && str_starts_with($route, '/wp/v2/block-renderer');
+        } else {
+            $bypass = is_admin() || is_preview() || is_customize_preview();
+        }
+        return (bool) apply_filters('vp_cache_bypass', $bypass);
     }
 
     /**
